@@ -1,0 +1,25 @@
+Bio-TinyRecursiveModels progress tracker
+=======================================
+
+System prep
+-----------
+- Verified repo structure and key components of TRM codebase.
+- Installed PyYAML, hydra-core, argdantic, adam-atan2-pytorch into `trm_env`.
+- Adjusted `pretrain.py` to import/use `AdamAtan2` with non-zero LR to satisfy v0.2.4 checks.
+- Updated `requirements.txt` to list `adam-atan2-pytorch`.
+
+ARC dataset work
+----------------
+- Generated full ARC dataset (arc1concept-aug-1000) and confirmed large augmentation growth.
+- Added `dataset/__init__.py` and invoked builder with trimmed augmentation to create `data/arc1concept-mini` (800 puzzles, 801 IDs).
+
+Training sanity checks (RTX 3050, 4 GB)
+---------------------------------------
+- Exported `DISABLE_COMPILE=1` and ran tiny TRM config:
+  * `global_batch_size=4`, `hidden_size=128`, `num_heads=2`, `expansion=2`,
+    `L_layers=1`, `L_cycles=2`, `H_cycles=1`.
+- Confirmed training loop completes, checkpoints save, and metrics log to WandB (`debug_run_tiny`).
+
+Next focus (TinyVariant POC)
+----------------------------
+- Ready to implement ClinVar ingestion and VariantTRM pipeline per POC plan.
