@@ -16,6 +16,11 @@ bioinformatics proof of concept on top.
 ClinVar pathogenic vs benign classification task using nothing fancier than
 an RTX 3050.**
 
+> The core training loop, halting logic, and attention layout follow Samsung
+> SAIT Montréal’s Tiny Recursive Models ([TRM paper](https://arxiv.org/abs/2504.04871)).
+> We keep their architecture intact and swap the ARC puzzle inputs for
+> ClinVar-derived feature tokens.
+
 That’s it. If the approach shows promise, the plan is to grow TinyVariant into
 a variant-analysis toolkit; if not, we pivot with a clear conscience.
 

@@ -65,6 +65,11 @@
   ```
   before rerunning training/baseline.
 
+2025-10-22, 21:30 : TRM paper alignment
+- Re-read Samsung SAIT’s Tiny Recursive Models paper (arXiv:2504.04871) to confirm architecture parity.
+- Noted in README that we inherit TRM’s recursive reasoning core and only swap the input tokens/labels.
+- Future changes: respect their embedding/halting conventions when adding new features.
+
 2025-10-22, 19:50 : ClinVar evaluation utilities
 - Added `tools/evaluate_clinvar_checkpoint.py` to score checkpoints with accuracy and ROC AUC on the ClinVar test split.
 - Introduced `evaluators/clinvar.py` and wired it into `cfg_clinvar.yaml` so evaluation metrics log automatically during training.
