@@ -87,4 +87,9 @@
 2025-10-22, 23:30 : Amino-acid property features
 - Added AA property buckets (nonpolar/charged/etc.) and change-class tokens to the TRM dataset.
 - Logistic baseline (80k/20k split) after rebuild: accuracy 0.823, ROC AUC 0.907.
-- Next: rerun `cfg_clinvar_long` on the 50k-per-class dataset to compare against new baseline.
+- Reran `cfg_clinvar_long` on the 50k-per-class dataset: accuracy 0.841, ROC AUC 0.915.
+- Baseline remains at 0.823 / 0.907 with the enriched features.
+
+2025-10-23, 00:30 : Added no-leakage test
+- Created `tests/test_clinvar_dataset.py` to ensure ClinSig tokens never appear in the TRM vocab and sequence length matches expectations.
+- README now documents how to run the quick pytest check.

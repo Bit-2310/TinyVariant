@@ -91,6 +91,11 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
        --output outputs/clinvar_logreg_metrics.json
    ```
 
+7. Sanity test (ensures no ClinicalSignificance leakage):
+   ```bash
+   python -m pytest tests/test_clinvar_dataset.py
+   ```
+
 ---
 
 ## Roadmap snapshot
