@@ -70,7 +70,16 @@ def split_dataframe(df: pd.DataFrame, train_ratio: float, seed: int) -> Tuple[pd
 
 
 def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, OneHotEncoder, StandardScaler]:
-    cat_features = df[["GeneSymbol", "Chromosome", "RefAllele", "AltAllele", "ProteinFrom", "ProteinTo"]]
+    cat_features = df[[
+        "GeneSymbol",
+        "Chromosome",
+        "ReviewStatus",
+        "ClinicalSignificance",
+        "RefAllele",
+        "AltAllele",
+        "ProteinFrom",
+        "ProteinTo",
+    ]]
     pos_feature = df[["ProteinPos"]].astype(np.float32)
     labels = df["Label"].to_numpy(dtype=np.int64)
 
@@ -87,7 +96,16 @@ def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, OneHotEn
 def prepare_features_with_encoders(
     df: pd.DataFrame, ohe: OneHotEncoder, scaler: StandardScaler
 ) -> Tuple[np.ndarray, np.ndarray]:
-    cat_features = df[["GeneSymbol", "Chromosome", "RefAllele", "AltAllele", "ProteinFrom", "ProteinTo"]]
+    cat_features = df[[
+        "GeneSymbol",
+        "Chromosome",
+        "ReviewStatus",
+        "ClinicalSignificance",
+        "RefAllele",
+        "AltAllele",
+        "ProteinFrom",
+        "ProteinTo",
+    ]]
     pos_feature = df[["ProteinPos"]].astype(np.float32)
     labels = df["Label"].to_numpy(dtype=np.int64)
 

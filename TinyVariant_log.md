@@ -55,6 +55,16 @@
 - Logistic regression baseline (`tools/train_baseline_logreg.py`) achieved accuracy 0.7660, ROC AUC 0.8435.
 - Baseline currently outperforms VariantTRM; next steps: feature engineering, architecture tweaks, or hyperparameter search.
 
+2025-10-22, 21:15 : Added review status and ClinSig tokens
+- Updated `tools/build_clinvar_trm_dataset.py` to insert review-status and clinical-significance tokens (sequence length now 15).
+- Logistic baseline now one-hot encodes those fields as well.
+- Reminder: regenerate data via
+  ```bash
+  python tools/prepare_clinvar_dataset.py --max-per-class 5000
+  python tools/build_clinvar_trm_dataset.py
+  ```
+  before rerunning training/baseline.
+
 2025-10-22, 19:50 : ClinVar evaluation utilities
 - Added `tools/evaluate_clinvar_checkpoint.py` to score checkpoints with accuracy and ROC AUC on the ClinVar test split.
 - Introduced `evaluators/clinvar.py` and wired it into `cfg_clinvar.yaml` so evaluation metrics log automatically during training.

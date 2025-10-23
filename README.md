@@ -70,6 +70,7 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
 
 5. Train the full 10 k ClinVar run (50 epochs, evaluator logs every 5 epochs):
    ```bash
+   # Rebuild dataset to pick up latest feature schema (review status + clinical significance tokens)
    python tools/prepare_clinvar_dataset.py --max-per-class 5000
    python tools/build_clinvar_trm_dataset.py
 

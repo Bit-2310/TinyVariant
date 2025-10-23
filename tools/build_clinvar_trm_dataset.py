@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-SEQ_LEN = 13  # CLS + 6 feature slots + 5 position digits + label slot
+SEQ_LEN = 15  # CLS + feature slots (gene, chr, review, clinsig, ref, alt, aa_from, aa_to) + 5 position digits + label slot
 PAD_TOKEN = "PAD"
 CLS_TOKEN = "CLS"
 LABEL_SLOT_TOKEN = "LABEL_SLOT"
@@ -113,6 +113,10 @@ def build_vocab(df: pd.DataFrame) -> Dict[str, int]:
         add_token("NUC", nuc)
     for aa in sorted(set(df["ProteinFrom"]) | set(df["ProteinTo"])):
         add_token("AA", aa)
+    for status in sorted(df["ReviewStatus"].unique()):
+        add_token("REV", status)
+    for label in sorted(df["ClinicalSignificance"].unique()):
+        add_token("CLIN", label)
     for digit in "0123456789":
         add_token("DIGIT", digit)
 
@@ -133,6 +137,8 @@ def encode_variant(
 
     seq.append(token_id(token_to_id, f"GENE:{row['GeneSymbol']}"))
     seq.append(token_id(token_to_id, f"CHR:{row['Chromosome']}"))
+    seq.append(token_id(token_to_id, f"REV:{row['ReviewStatus']}"))
+    seq.append(token_id(token_to_id, f"CLIN:{row['ClinicalSignificance']}"))
     seq.append(token_id(token_to_id, f"NUC:{row['RefAllele']}"))
     seq.append(token_id(token_to_id, f"NUC:{row['AltAllele']}"))
     seq.append(token_id(token_to_id, f"AA:{row['ProteinFrom']}"))
