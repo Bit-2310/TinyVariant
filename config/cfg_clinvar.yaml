@@ -1,0 +1,38 @@
+# ClinVar training config
+
+defaults:
+  - arch: variant_trm
+  - _self_
+
+hydra:
+  output_subdir: null
+
+data_paths: ['data/clinvar/processed/clinvar_trm']
+data_paths_test: ['data/clinvar/processed/clinvar_trm']
+
+evaluators:
+  - name: clinvar@ClinVarEvaluator
+    vocab_path: data/clinvar/processed/clinvar_trm/vocab.json
+
+global_batch_size: 256
+
+epochs: 20
+eval_interval: 5
+checkpoint_every_eval: True
+
+lr: 1e-3
+lr_min_ratio: 0.1
+lr_warmup_steps: 200
+
+beta1: 0.9
+beta2: 0.95
+weight_decay: 0.01
+puzzle_emb_weight_decay: 0.0
+
+puzzle_emb_lr: 0.0
+
+seed: 42
+min_eval_interval: 0
+
+ema: False
+freeze_weights: False

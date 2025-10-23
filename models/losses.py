@@ -101,3 +101,48 @@ class ACTLossHead(nn.Module):
 
         return new_carry, lm_loss + 0.5 * (q_halt_loss + q_continue_loss), metrics, detached_outputs, new_carry.halted.all()
 
+
+class VariantClassificationHead(nn.Module):
+    def __init__(self, model: nn.Module):
+        super().__init__()
+        self.model = model
+
+    def initial_carry(self, *args, **kwargs):
+        return self.model.initial_carry(*args, **kwargs)  # type: ignore
+
+    def forward(
+        self,
+        return_keys: Sequence[str],
+        **model_kwargs,
+    ) -> Tuple[Any, torch.Tensor, Dict[str, torch.Tensor], Optional[Dict[str, torch.Tensor]], torch.Tensor]:
+        new_carry, outputs = self.model(**model_kwargs)
+        labels = new_carry.current_data["labels"]
+
+        final_logits = outputs["logits"][:, -1, :]
+        final_labels = labels[:, -1]
+        valid_mask = final_labels != IGNORE_LABEL_ID
+
+        preds = final_logits.argmax(dim=-1)
+
+        if valid_mask.any():
+            target_labels = final_labels[valid_mask].to(torch.long)
+            loss = F.cross_entropy(final_logits[valid_mask], target_labels, reduction="sum")
+
+            correct = (preds[valid_mask] == target_labels).to(torch.float32)
+            metrics = {
+                "count": valid_mask.sum(),
+                "accuracy": correct.sum(),
+                "ce_loss": loss.detach(),
+            }
+        else:
+            loss = torch.tensor(0.0, device=final_logits.device)
+            metrics = {
+                "count": torch.tensor(0, device=final_logits.device),
+                "accuracy": torch.tensor(0.0, device=final_logits.device),
+                "ce_loss": torch.tensor(0.0, device=final_logits.device),
+            }
+
+        outputs["preds"] = preds
+        detached_outputs = {k: outputs[k].detach() for k in return_keys if k in outputs}
+
+        return new_carry, loss, metrics, detached_outputs, new_carry.halted.all()

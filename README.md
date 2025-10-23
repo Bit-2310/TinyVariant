@@ -61,6 +61,29 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```
    You’ll see WandB logs and a checkpoint under `checkpoints/`.
 
+4. Evaluate a ClinVar checkpoint locally:
+   ```bash
+   python tools/evaluate_clinvar_checkpoint.py \
+       --config checkpoints/Clinvar_trm_ACT-torch/clinvar_smoke/all_config.yaml \
+       --checkpoint checkpoints/Clinvar_trm_ACT-torch/clinvar_smoke/step_62
+   ```
+
+5. Train the full 10 k ClinVar run (50 epochs, evaluator logs every 5 epochs):
+   ```bash
+   python tools/prepare_clinvar_dataset.py --max-per-class 5000
+   python tools/build_clinvar_trm_dataset.py
+
+   WANDB_MODE=offline DISABLE_COMPILE=1 \
+   python pretrain.py --config-name cfg_clinvar_long +run_name=clinvar_long
+   ```
+
+6. Baseline comparison (logistic regression on the same split):
+   ```bash
+   python tools/train_baseline_logreg.py \
+       --input data/clinvar/processed/clinvar_missense_balanced.tsv \
+       --output outputs/clinvar_logreg_metrics.json
+   ```
+
 ---
 
 ## Roadmap snapshot
