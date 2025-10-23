@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-SEQ_LEN = 15  # CLS + feature slots (gene bucket, chromosome, review, ref/alt bases, amino acids, consequence) + 5 position digits + label slot
+SEQ_LEN = 18  # CLS + feature slots (gene bucket, chromosome, review, ref/alt bases, amino acids, consequence) + 5 position digits + label slot
 PAD_TOKEN = "PAD"
 CLS_TOKEN = "CLS"
 LABEL_SLOT_TOKEN = "LABEL_SLOT"
@@ -30,6 +30,32 @@ LABEL_TOKENS = {
 SPECIAL_TOKENS = [PAD_TOKEN, CLS_TOKEN, LABEL_SLOT_TOKEN] + list(LABEL_TOKENS.values())
 
 RANDOM_SEED = 42
+
+AA_PROPERTY = {
+    'A': 'nonpolar',
+    'R': 'positive',
+    'N': 'polar',
+    'D': 'negative',
+    'C': 'polar',
+    'Q': 'polar',
+    'E': 'negative',
+    'G': 'nonpolar',
+    'H': 'positive',
+    'I': 'nonpolar',
+    'L': 'nonpolar',
+    'K': 'positive',
+    'M': 'nonpolar',
+    'F': 'nonpolar',
+    'P': 'nonpolar',
+    'S': 'polar',
+    'T': 'polar',
+    'W': 'nonpolar',
+    'Y': 'polar',
+    'V': 'nonpolar',
+    '*': 'stop'
+}
+
+AA_CHANGE_DEFAULT = '<unknown_change>'
 
 
 def get_repo_version() -> str:
@@ -97,6 +123,9 @@ def load_balanced_table(path: Path) -> pd.DataFrame:
     df['GeneBucket'] = df['GeneSymbol'].where(df['GeneSymbol'].isin(common_genes), '<RARE>')
     df['Consequence'] = df['Name'].str.extract('\(([^)]+)\)')
     df['Consequence'] = df['Consequence'].where(df['Consequence'].notna(), '<unknown>')
+    df['AAPropFrom'] = df['ProteinFrom'].map(AA_PROPERTY).fillna('<unknown>')
+    df['AAPropTo'] = df['ProteinTo'].map(AA_PROPERTY).fillna('<unknown>')
+    df['AAChangeClass'] = df.apply(lambda r: 'same' if r['AAPropFrom'] == r['AAPropTo'] else r['AAPropFrom'] + '->' + r['AAPropTo'], axis=1)
     return df
 
 
@@ -118,6 +147,12 @@ def build_vocab(df: pd.DataFrame) -> Dict[str, int]:
         add_token("NUC", nuc)
     for aa in sorted(set(df["ProteinFrom"]) | set(df["ProteinTo"])):
         add_token("AA", aa)
+    for prop in sorted(df["AAPropFrom"].unique()):
+        add_token("AAPROP", prop)
+    for prop in sorted(df["AAPropTo"].unique()):
+        add_token("AAPROP", prop)
+    for change in sorted(df["AAChangeClass"].unique()):
+        add_token("AACHANGE", change)
     for status in sorted(df["ReviewStatus"].unique()):
         add_token("REV", status)
     for consequence in sorted(df["Consequence"].unique()):
@@ -147,6 +182,9 @@ def encode_variant(
     seq.append(token_id(token_to_id, f"NUC:{row['AltAllele']}"))
     seq.append(token_id(token_to_id, f"AA:{row['ProteinFrom']}"))
     seq.append(token_id(token_to_id, f"AA:{row['ProteinTo']}"))
+    seq.append(token_id(token_to_id, f"AAPROP:{row['AAPropFrom']}"))
+    seq.append(token_id(token_to_id, f"AAPROP:{row['AAPropTo']}"))
+    seq.append(token_id(token_to_id, f"AACHANGE:{row['AAChangeClass']}"))
     seq.append(token_id(token_to_id, f"CONSEQ:{row['Consequence']}"))
 
     pos_str = f"{int(row['ProteinPos']):05d}"

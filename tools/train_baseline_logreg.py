@@ -52,6 +52,31 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+AA_PROPERTY = {
+    'A': 'nonpolar',
+    'R': 'positive',
+    'N': 'polar',
+    'D': 'negative',
+    'C': 'polar',
+    'Q': 'polar',
+    'E': 'negative',
+    'G': 'nonpolar',
+    'H': 'positive',
+    'I': 'nonpolar',
+    'L': 'nonpolar',
+    'K': 'positive',
+    'M': 'nonpolar',
+    'F': 'nonpolar',
+    'P': 'nonpolar',
+    'S': 'polar',
+    'T': 'polar',
+    'W': 'nonpolar',
+    'Y': 'polar',
+    'V': 'nonpolar',
+    '*': 'stop'
+}
+
+
 def split_dataframe(df: pd.DataFrame, train_ratio: float, seed: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
     rng = np.random.default_rng(seed)
     train_idx = []
@@ -76,6 +101,9 @@ def _augment_df(df: pd.DataFrame) -> pd.DataFrame:
     df['GeneBucket'] = df['GeneSymbol'].where(df['GeneSymbol'].isin(common_genes), '<RARE>')
     df['Consequence'] = df['Name'].str.extract('\(([^)]+)\)')
     df['Consequence'] = df['Consequence'].where(df['Consequence'].notna(), '<unknown>')
+    df['AAPropFrom'] = df['ProteinFrom'].map(AA_PROPERTY).fillna('<unknown>')
+    df['AAPropTo'] = df['ProteinTo'].map(AA_PROPERTY).fillna('<unknown>')
+    df['AAChangeClass'] = df.apply(lambda r: 'same' if r['AAPropFrom'] == r['AAPropTo'] else r['AAPropFrom'] + '->' + r['AAPropTo'], axis=1)
     return df
 
 
@@ -86,6 +114,9 @@ def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, OneHotEn
         'Chromosome',
         'ReviewStatus',
         'Consequence',
+        'AAPropFrom',
+        'AAPropTo',
+        'AAChangeClass',
         'RefAllele',
         'AltAllele',
         'ProteinFrom',
@@ -113,6 +144,9 @@ def prepare_features_with_encoders(
         'Chromosome',
         'ReviewStatus',
         'Consequence',
+        'AAPropFrom',
+        'AAPropTo',
+        'AAChangeClass',
         'RefAllele',
         'AltAllele',
         'ProteinFrom',

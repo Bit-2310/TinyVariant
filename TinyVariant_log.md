@@ -84,3 +84,7 @@
 - Added `tools/evaluate_clinvar_checkpoint.py` to score checkpoints with accuracy and ROC AUC on the ClinVar test split.
 - Introduced `evaluators/clinvar.py` and wired it into `cfg_clinvar.yaml` so evaluation metrics log automatically during training.
 - Updated the README Quickstart with a sample evaluation command.
+2025-10-22, 23:30 : Amino-acid property features
+- Added AA property buckets (nonpolar/charged/etc.) and change-class tokens to the TRM dataset.
+- Logistic baseline (80k/20k split) after rebuild: accuracy 0.823, ROC AUC 0.907.
+- Next: rerun `cfg_clinvar_long` on the 50k-per-class dataset to compare against new baseline.
