@@ -93,3 +93,7 @@
 2025-10-23, 00:30 : Added no-leakage test
 - Created `tests/test_clinvar_dataset.py` to ensure ClinSig tokens never appear in the TRM vocab and sequence length matches expectations.
 - README now documents how to run the quick pytest check.
+
+2025-10-23, 00:45 : Hyperparameter sweep config
+- Added `config/clinvar_sweep.yaml` to drive Hydra multiruns over hidden size, L layers, L cycles, and learning rate.
+- README documents the sweep command (`python pretrain.py --config-name clinvar_sweep --multirun`).

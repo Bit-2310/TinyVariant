@@ -97,6 +97,14 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```
    (Requires the balanced ClinVar TSV under `data/clinvar/processed/clinvar_missense_balanced.tsv`.)
 
+8. Hyperparameter sweep example:
+   ```bash
+   WANDB_MODE=offline DISABLE_COMPILE=1 \
+   python pretrain.py --config-name clinvar_sweep --multirun
+   ```
+   (Sweeps hidden size, L_layers, L_cycles, and learning rate; results saved under
+   `checkpoints/Clinvar_trm-ACT-torch/clinvar_sweep_*`.)
+
 ---
 
 ## Roadmap snapshot
