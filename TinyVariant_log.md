@@ -67,8 +67,13 @@
 
 2025-10-22, 22:20 : Results with enriched features
 - `cfg_clinvar_long` (50 epochs, 10 k data): accuracy 0.9165, ROC AUC 0.9771.
-- Logistic regression baseline: accuracy 0.9690, ROC AUC 0.9849.
+- Logistic regression baseline: accuracy 0.9690, ROC AUC 0.9849 (feature leakage suspected).
 - CPU evaluation script now supports loading checkpoints without CUDA.
+
+2025-10-22, 22:40 : Removed ClinSig-derived leakage
+- Stripped all ClinicalSignificance-based tokens from dataset builder and baseline.
+- Logistic baseline (8k/2k split) now reports accuracy ≈0.746, ROC AUC ≈0.838.
+- Request: regenerate data and rerun `cfg_clinvar_long` for fresh TRM metrics.
 
 2025-10-22, 21:30 : TRM architecture alignment
 - Re-read Samsung SAIT’s Tiny Recursive Models documentation to confirm architecture parity.

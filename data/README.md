@@ -39,3 +39,7 @@ To expand to 10 k (5 k per class):
 python tools/prepare_clinvar_dataset.py --max-per-class 5000
 python tools/build_clinvar_trm_dataset.py
 ```
+
+Larger runs are possible (e.g., 50 k per class) by increasing `--max-per-class`.
+The builder automatically buckets rare genes and strips any ClinSig-derived
+columns to avoid label leakage in downstream experiments.

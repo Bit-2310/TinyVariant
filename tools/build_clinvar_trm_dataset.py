@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-SEQ_LEN = 15  # CLS + feature slots (gene, chr, review, clinsig, ref, alt, aa_from, aa_to) + 5 position digits + label slot
+SEQ_LEN = 15  # CLS + feature slots (gene bucket, chromosome, review, ref/alt bases, amino acids, consequence) + 5 position digits + label slot
 PAD_TOKEN = "PAD"
 CLS_TOKEN = "CLS"
 LABEL_SLOT_TOKEN = "LABEL_SLOT"
@@ -92,6 +92,11 @@ def parse_args() -> argparse.Namespace:
 
 def load_balanced_table(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, sep="\t")
+    counts = df['GeneSymbol'].value_counts()
+    common_genes = counts[counts >= 5].index
+    df['GeneBucket'] = df['GeneSymbol'].where(df['GeneSymbol'].isin(common_genes), '<RARE>')
+    df['Consequence'] = df['Name'].str.extract('\(([^)]+)\)')
+    df['Consequence'] = df['Consequence'].where(df['Consequence'].notna(), '<unknown>')
     return df
 
 
@@ -105,8 +110,8 @@ def build_vocab(df: pd.DataFrame) -> Dict[str, int]:
         if token not in token_to_id:
             token_to_id[token] = len(token_to_id)
 
-    for gene in sorted(df["GeneSymbol"].unique()):
-        add_token("GENE", gene)
+    for gene_bucket in sorted(df["GeneBucket"].unique()):
+        add_token("GENE", gene_bucket)
     for chrom in sorted(df["Chromosome"].unique()):
         add_token("CHR", chrom)
     for nuc in ["A", "C", "G", "T"]:
@@ -115,8 +120,8 @@ def build_vocab(df: pd.DataFrame) -> Dict[str, int]:
         add_token("AA", aa)
     for status in sorted(df["ReviewStatus"].unique()):
         add_token("REV", status)
-    for label in sorted(df["ClinicalSignificance"].unique()):
-        add_token("CLIN", label)
+    for consequence in sorted(df["Consequence"].unique()):
+        add_token("CONSEQ", consequence)
     for digit in "0123456789":
         add_token("DIGIT", digit)
 
@@ -135,14 +140,14 @@ def encode_variant(
 
     seq.append(token_id(token_to_id, CLS_TOKEN))
 
-    seq.append(token_id(token_to_id, f"GENE:{row['GeneSymbol']}"))
+    seq.append(token_id(token_to_id, f"GENE:{row['GeneBucket']}"))
     seq.append(token_id(token_to_id, f"CHR:{row['Chromosome']}"))
     seq.append(token_id(token_to_id, f"REV:{row['ReviewStatus']}"))
-    seq.append(token_id(token_to_id, f"CLIN:{row['ClinicalSignificance']}"))
     seq.append(token_id(token_to_id, f"NUC:{row['RefAllele']}"))
     seq.append(token_id(token_to_id, f"NUC:{row['AltAllele']}"))
     seq.append(token_id(token_to_id, f"AA:{row['ProteinFrom']}"))
     seq.append(token_id(token_to_id, f"AA:{row['ProteinTo']}"))
+    seq.append(token_id(token_to_id, f"CONSEQ:{row['Consequence']}"))
 
     pos_str = f"{int(row['ProteinPos']):05d}"
     for digit in pos_str:
@@ -319,3 +324,5 @@ def get_git_commit() -> str:
         return commit.decode("utf-8").strip()
     except Exception:
         return "unknown"
+    for consequence in sorted(set(df['Consequence'].unique()).union(set(df['GeneSymbol'].unique()))):
+        add_token('CONSEQ', consequence)

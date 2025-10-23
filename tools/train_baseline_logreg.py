@@ -69,21 +69,32 @@ def split_dataframe(df: pd.DataFrame, train_ratio: float, seed: int) -> Tuple[pd
     return train_df, test_df
 
 
-def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, OneHotEncoder, StandardScaler]:
-    cat_features = df[[
-        "GeneSymbol",
-        "Chromosome",
-        "ReviewStatus",
-        "ClinicalSignificance",
-        "RefAllele",
-        "AltAllele",
-        "ProteinFrom",
-        "ProteinTo",
-    ]]
-    pos_feature = df[["ProteinPos"]].astype(np.float32)
-    labels = df["Label"].to_numpy(dtype=np.int64)
+def _augment_df(df: pd.DataFrame) -> pd.DataFrame:
+    counts = df['GeneSymbol'].value_counts()
+    common_genes = counts[counts >= 5].index
+    df = df.copy()
+    df['GeneBucket'] = df['GeneSymbol'].where(df['GeneSymbol'].isin(common_genes), '<RARE>')
+    df['Consequence'] = df['Name'].str.extract('\(([^)]+)\)')
+    df['Consequence'] = df['Consequence'].where(df['Consequence'].notna(), '<unknown>')
+    return df
 
-    ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=True)
+
+def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, OneHotEncoder, StandardScaler]:
+    df = _augment_df(df)
+    cat_features = df[[
+        'GeneBucket',
+        'Chromosome',
+        'ReviewStatus',
+        'Consequence',
+        'RefAllele',
+        'AltAllele',
+        'ProteinFrom',
+        'ProteinTo',
+    ]]
+    pos_feature = df[['ProteinPos']].astype(np.float32)
+    labels = df['Label'].to_numpy(dtype=np.int64)
+
+    ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=True)
     X_cat = ohe.fit_transform(cat_features)
 
     scaler = StandardScaler()
@@ -96,18 +107,19 @@ def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, OneHotEn
 def prepare_features_with_encoders(
     df: pd.DataFrame, ohe: OneHotEncoder, scaler: StandardScaler
 ) -> Tuple[np.ndarray, np.ndarray]:
+    df = _augment_df(df)
     cat_features = df[[
-        "GeneSymbol",
-        "Chromosome",
-        "ReviewStatus",
-        "ClinicalSignificance",
-        "RefAllele",
-        "AltAllele",
-        "ProteinFrom",
-        "ProteinTo",
+        'GeneBucket',
+        'Chromosome',
+        'ReviewStatus',
+        'Consequence',
+        'RefAllele',
+        'AltAllele',
+        'ProteinFrom',
+        'ProteinTo',
     ]]
-    pos_feature = df[["ProteinPos"]].astype(np.float32)
-    labels = df["Label"].to_numpy(dtype=np.int64)
+    pos_feature = df[['ProteinPos']].astype(np.float32)
+    labels = df['Label'].to_numpy(dtype=np.int64)
 
     X_cat = ohe.transform(cat_features)
     X_pos = scaler.transform(pos_feature)
