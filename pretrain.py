@@ -250,15 +250,20 @@ def load_checkpoint(model: nn.Module, config: PretrainConfig):
 
         # Resize and reset puzzle emb if needed
         puzzle_emb_name = "_orig_mod.model.inner.puzzle_emb.weights"
-        expected_shape: torch.Size = model.model.puzzle_emb.weights.shape  # type: ignore
-        if puzzle_emb_name in state_dict:
-            puzzle_emb = state_dict[puzzle_emb_name]
-            if puzzle_emb.shape != expected_shape:
-                print(f"Resetting puzzle embedding as shape is different. Found {puzzle_emb.shape}, Expected {expected_shape}")
-                # Re-initialize using mean
-                state_dict[puzzle_emb_name] = (
-                    torch.mean(puzzle_emb, dim=0, keepdim=True).expand(expected_shape).contiguous()
-                )
+        puzzle_emb_module = getattr(getattr(model, "model", model), "puzzle_emb", None)
+        if puzzle_emb_module is not None:
+            expected_shape: torch.Size = puzzle_emb_module.weights.shape  # type: ignore
+            if puzzle_emb_name in state_dict:
+                puzzle_emb = state_dict[puzzle_emb_name]
+                if puzzle_emb.shape != expected_shape:
+                    print(f"Resetting puzzle embedding as shape is different. Found {puzzle_emb.shape}, Expected {expected_shape}")
+                    # Re-initialize using mean
+                    state_dict[puzzle_emb_name] = (
+                        torch.mean(puzzle_emb, dim=0, keepdim=True).expand(expected_shape).contiguous()
+                    )
+        elif puzzle_emb_name in state_dict:
+            # Remove puzzle embedding entry when model does not use one
+            del state_dict[puzzle_emb_name]
         model.load_state_dict(state_dict, assign=True)
 
 

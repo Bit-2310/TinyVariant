@@ -12,12 +12,17 @@ from __future__ import annotations
 import argparse
 import os
 import json
+import sys
 from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
 import torch
 from omegaconf import OmegaConf
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from pretrain import PretrainConfig, create_model
 from puzzle_dataset import PuzzleDataset, PuzzleDatasetConfig
@@ -133,7 +138,8 @@ def main() -> None:
     with torch.no_grad():
         for _set_name, batch, _global_batch in eval_dataset:
             batch = {k: v.to(device) for k, v in batch.items()}
-            carry = model.initial_carry(batch)
+            with torch.device(device):
+                carry = model.initial_carry(batch)
 
             while True:
                 carry, _loss, _metrics, outputs, done = model(
