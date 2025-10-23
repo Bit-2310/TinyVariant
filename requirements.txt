@@ -20,3 +20,4 @@ numba
 triton
 pandas
 scikit-learn
+pytest

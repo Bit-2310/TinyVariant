@@ -121,8 +121,10 @@ def load_balanced_table(path: Path) -> pd.DataFrame:
     counts = df['GeneSymbol'].value_counts()
     common_genes = counts[counts >= 5].index
     df['GeneBucket'] = df['GeneSymbol'].where(df['GeneSymbol'].isin(common_genes), '<RARE>')
+
     df['Consequence'] = df['Name'].str.extract('\(([^)]+)\)')
     df['Consequence'] = df['Consequence'].where(df['Consequence'].notna(), '<unknown>')
+
     df['AAPropFrom'] = df['ProteinFrom'].map(AA_PROPERTY).fillna('<unknown>')
     df['AAPropTo'] = df['ProteinTo'].map(AA_PROPERTY).fillna('<unknown>')
     df['AAChangeClass'] = df.apply(lambda r: 'same' if r['AAPropFrom'] == r['AAPropTo'] else r['AAPropFrom'] + '->' + r['AAPropTo'], axis=1)
