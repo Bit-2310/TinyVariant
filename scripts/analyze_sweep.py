@@ -38,7 +38,7 @@ def main() -> None:
         print("No sweep results found under", SWEEP_ROOT)
         return
 
-    records = [load_run_metrics(run) for run in runs]
+    records = [load_run_metrics(run) for run in runs if (run / 'all_config.yaml').exists()]
     df = pd.DataFrame(records)
     df = df.dropna(subset=["roc_auc", "accuracy"])
     if df.empty:

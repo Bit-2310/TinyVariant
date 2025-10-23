@@ -101,9 +101,10 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```bash
    WANDB_MODE=offline DISABLE_COMPILE=1 \
    python pretrain.py --config-name clinvar_sweep --multirun
+   python scripts/analyze_sweep.py
    ```
-   (Sweeps hidden size, L_layers, L_cycles, and learning rate; results saved under
-   `checkpoints/Clinvar_trm-ACT-torch/clinvar_sweep_*`.)
+   (Sweeps hidden size, L_layers, L_cycles, and learning rate; each run is stored under
+   `checkpoints/Clinvar_trm-ACT-torch/<override_dirname>`.)
 
 ---
 

@@ -2,17 +2,14 @@ defaults:
   - cfg_clinvar_long
   - _self_
 
-# Base run name will be expanded per job index
-run_name: clinvar_sweep_${hydra.job.num}
-
 hydra:
   mode: MULTIRUN
   sweep:
     dir: checkpoints/Clinvar_trm-ACT-torch
-    subdir: ${run_name}
+    subdir: ${hydra.job.override_dirname}
   sweeper:
     params:
       arch.hidden_size: 256,384
       arch.L_layers: 2,3
-      lr: 5e-4,3e-4
       arch.L_cycles: 2,3
+      lr: 5e-4,3e-4

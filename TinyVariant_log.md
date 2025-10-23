@@ -97,3 +97,7 @@
 2025-10-23, 00:45 : Hyperparameter sweep config
 - Added `config/clinvar_sweep.yaml` to drive Hydra multiruns over hidden size, L layers, L cycles, and learning rate.
 - README documents the sweep command (`python pretrain.py --config-name clinvar_sweep --multirun`).
+
+2025-10-23, 19:00 : Integrated sweep analyzer
+- Updated `config/clinvar_sweep.yaml` to rely on Hydra override directories.
+- Added `scripts/analyze_sweep.py` and documented the workflow (run sweep + analyzer).
