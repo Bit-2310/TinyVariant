@@ -95,6 +95,7 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```bash
    python -m pytest tests/test_clinvar_dataset.py
    ```
+   (Requires the balanced ClinVar TSV under `data/clinvar/processed/clinvar_missense_balanced.tsv`.)
 
 ---
 
