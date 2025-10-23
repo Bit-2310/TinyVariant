@@ -109,14 +109,32 @@ def main() -> None:
     with metadata_path.open("r") as f:
         metadata = PuzzleDatasetMetadata(**json.load(f))
 
-    device = (
-        torch.device("cuda")
-        if args.device == "auto" and torch.cuda.is_available()
-        else torch.device(args.device if args.device != "auto" else "cpu")
-    )
-
+    if args.device == "auto":
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+            use_gpu = True
+        else:
+            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+            device = torch.device("cpu")
+            use_gpu = False
+    else:
+        device = torch.device(args.device)
+        if device.type == "cpu":
+            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+            use_gpu = False
+        else:
+            use_gpu = torch.cuda.is_available()
+    if not use_gpu:
+        config.load_checkpoint = None
     model, _, _ = create_model(config, metadata, rank=0, world_size=1)
-    model.to(device)
+    if use_gpu:
+        model.to(device)
+        model.eval()
+    else:
+        model.cpu()
+        model.eval()
+        state_dict = torch.load(args.checkpoint, map_location="cpu")
+        model.load_state_dict(state_dict, strict=False)
     model.eval()
 
     dataset_paths = config.data_paths_test if len(config.data_paths_test) else config.data_paths
@@ -137,8 +155,11 @@ def main() -> None:
 
     with torch.no_grad():
         for _set_name, batch, _global_batch in eval_dataset:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            with torch.device(device):
+            if use_gpu:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                carry = model.initial_carry(batch)
+            else:
+                batch = {k: v.cpu() for k, v in batch.items()}
                 carry = model.initial_carry(batch)
 
             while True:

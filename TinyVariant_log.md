@@ -65,6 +65,11 @@
   ```
   before rerunning training/baseline.
 
+2025-10-22, 22:20 : Results with enriched features
+- `cfg_clinvar_long` (50 epochs, 10 k data): accuracy 0.9165, ROC AUC 0.9771.
+- Logistic regression baseline: accuracy 0.9690, ROC AUC 0.9849.
+- CPU evaluation script now supports loading checkpoints without CUDA.
+
 2025-10-22, 21:30 : TRM architecture alignment
 - Re-read Samsung SAIT’s Tiny Recursive Models documentation to confirm architecture parity.
 - Noted in README that we inherit TRM’s recursive reasoning core and only swap the input tokens/labels.

@@ -70,6 +70,7 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    python tools/evaluate_clinvar_checkpoint.py \
        --config checkpoints/Clinvar_trm_ACT-torch/clinvar_smoke/all_config.yaml \
        --checkpoint checkpoints/Clinvar_trm_ACT-torch/clinvar_smoke/step_62
+   # Add `--device cpu` if CUDA is unavailable.
    ```
 
 5. Train the full 10 k ClinVar run (50 epochs, evaluator logs every 5 epochs):
