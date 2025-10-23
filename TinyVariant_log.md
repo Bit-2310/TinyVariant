@@ -65,8 +65,8 @@
   ```
   before rerunning training/baseline.
 
-2025-10-22, 21:30 : TRM paper alignment
-- Re-read Samsung SAIT’s Tiny Recursive Models paper (arXiv:2504.04871) to confirm architecture parity.
+2025-10-22, 21:30 : TRM architecture alignment
+- Re-read Samsung SAIT’s Tiny Recursive Models documentation to confirm architecture parity.
 - Noted in README that we inherit TRM’s recursive reasoning core and only swap the input tokens/labels.
 - Future changes: respect their embedding/halting conventions when adding new features.
 
