@@ -21,3 +21,4 @@ triton
 pandas
 scikit-learn
 pytest
+matplotlib

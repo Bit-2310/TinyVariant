@@ -15,6 +15,7 @@ import json
 import sys
 from pathlib import Path
 from typing import List, Tuple
+from contextlib import nullcontext
 
 import numpy as np
 import torch
@@ -61,6 +62,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Optional path to save metrics as JSON.",
+    )
+    parser.add_argument(
+        "--save-preds",
+        type=Path,
+        default=None,
+        help="Optional path to save per-example predictions as JSON lines.",
     )
     return parser.parse_args()
 
@@ -152,12 +159,21 @@ def main() -> None:
     all_labels: List[int] = []
     all_preds: List[int] = []
     all_scores: List[float] = []
+    all_variants: List[int] = []
+
+    if use_gpu:
+        cuda_arg: str | int
+        cuda_arg = device.index if device.index is not None else device.type
+        device_ctx = torch.cuda.device(cuda_arg)
+    else:
+        device_ctx = nullcontext()
 
     with torch.no_grad():
         for _set_name, batch, _global_batch in eval_dataset:
             if use_gpu:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                carry = model.initial_carry(batch)
+                with device_ctx:
+                    carry = model.initial_carry(batch)
             else:
                 batch = {k: v.cpu() for k, v in batch.items()}
                 carry = model.initial_carry(batch)
@@ -181,6 +197,7 @@ def main() -> None:
                 all_labels.extend(labels.cpu().tolist())
                 all_preds.extend(logits.argmax(dim=-1).cpu().tolist())
                 all_scores.extend(probs[:, pathogenic_id].cpu().tolist())
+                all_variants.extend(batch["puzzle_identifiers"][mask].cpu().tolist())
 
     all_labels = np.array(all_labels, dtype=np.int64)
     all_preds = np.array(all_preds, dtype=np.int64)
@@ -204,6 +221,22 @@ def main() -> None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("w") as f:
             json.dump(metrics, f, indent=2)
+
+    if args.save_preds is not None:
+        args.save_preds.parent.mkdir(parents=True, exist_ok=True)
+        with args.save_preds.open("w") as f:
+            for variant_id, label, pred, score in zip(all_variants, all_labels, all_preds, all_scores):
+                label_token = int(label)
+                pred_token = int(pred)
+                record = {
+                    "variant_id": int(variant_id),
+                    "label": int(label == pathogenic_id),
+                    "pred": int(pred == pathogenic_id),
+                    "score": float(score),
+                    "label_token_id": label_token,
+                    "pred_token_id": pred_token,
+                }
+                f.write(json.dumps(record) + "\n")
 
 
 if __name__ == "__main__":

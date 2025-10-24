@@ -106,3 +106,42 @@
 - `PretrainConfig` now accepts `early_stop_patience`, `early_stop_metric`, and `early_stop_delta`.
 - Training loop stops when the chosen metric fails to improve beyond `early_stop_delta` for `patience` evaluations.
 - README documents usage via `+early_stop_patience=...`.
+
+2025-10-24, 09:10 : ClinVar preprocessing enrichment
+- Expanded `tools/prepare_clinvar_dataset.py` to retain phenotype terms/IDs, submitter counts, ISO-normalized review dates, and derived provenance buckets.
+- Normalized phenotype strings (dedupe, placeholder filtering) and tracked coverage stats in `clinvar_missense_balanced_stats.json`.
+- Verified pipeline with a 50-per-class smoke build under `data/clinvar/processed/tmp_balanced`.
+
+2025-10-24, 09:40 : Phenotype context in TRM + baselines
+- Updated `tools/build_clinvar_trm_dataset.py` to emit phenotype/source/submitter/evaluation tokens (sequence length 24) and persist feature metadata in dataset manifests.
+- Synced logistic regression baseline with the new context features via shared preprocessing helpers.
+- Extended pytest coverage to assert phenotype tokens are present and leak-free.
+
+2025-10-24, 10:15 : Baseline runner ergonomics
+- Added `tools/__init__.py` and path bootstrapping so `python tools/train_baseline_logreg.py` works without manual `PYTHONPATH` tweaks.
+- Successfully reran the logistic regression baseline on the refreshed 5k/5k dataset (accuracy ≈0.861, ROC AUC ≈0.930).
+
+2025-10-24, 17:25 : VariantTRM run with phenotype context
+- Trained `cfg_clinvar_long` on the 5k/5k dataset with `+early_stop_patience=5` (offline WandB run `clinvar_long_5k`).
+- Final evaluation: accuracy ≈0.819, ROC AUC ≈0.884; checkpoints saved under `checkpoints/Clinvar_trm-ACT-torch/clinvar_long_5k/`.
+- Noted the performance gap vs. the logistic baseline, highlighting the need for further feature/model work.
+
+2025-10-24, 17:45 : Expanded ClinVar dataset tests
+- Augmented `tests/test_clinvar_dataset.py` to verify phenotype/provenance buckets, feature metadata, and updated sequence length (now 25).
+- All ClinVar tests pass against the refreshed 5k/5k dataset (`python -m pytest tests/test_clinvar_dataset.py` → 5 passed).
+
+2025-10-24, 18:10 : Added tertiary phenotype slots
+- Extended `tools/build_clinvar_trm_dataset.py` to encode up to three phenotype tokens (sequence length 25) and preserved slot metadata.
+- Updated the logistic baseline, docs, and tests to stay in sync; new baseline run: accuracy ≈0.860, ROC AUC ≈0.930.
+
+2025-10-24, 18:55 : ClinVar dataset rebuild + run recap
+- Regenerated the balanced ClinVar table (5k per class) and rebuilt the TRM dataset so phenotype/provenance fields populate all tokens.
+- Trained `cfg_clinvar_long` with `+early_stop_patience=5` (`clinvar_long_20251024-175518`); early stopping fired at step 1248, final eval accuracy 0.819, ROC AUC 0.8859.
+- Logistic baseline rerun on the refreshed dataset: accuracy 0.860, ROC AUC 0.9300 (8k/2k split).
+- Evaluated `step_1248` with both CPU and CUDA modes after fixing `tools/evaluate_clinvar_checkpoint.py` to create carries on-device; scores match training (accuracy 0.8195, ROC AUC 0.8858).
+
+2025-10-24, 19:20 : Plotting helpers for documentation
+- Extended `tools/evaluate_clinvar_checkpoint.py` with `--save-preds` so per-example scores can be captured alongside summary metrics.
+- Added `scripts/plot_eval_comparison.py` to visualize TinyVariant vs. baseline accuracy/AUC from saved JSON metrics.
+- Added `scripts/plot_roc_curve.py` to render ROC curves from prediction JSONL files (pairs with the new evaluation flag).
+- README Quickstart now documents the evaluation output flags and plotting workflow for future write-ups.

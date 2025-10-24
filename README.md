@@ -65,39 +65,56 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```
    You’ll see WandB logs and a checkpoint under `checkpoints/`.
 
-4. Evaluate a ClinVar checkpoint locally:
-   ```bash
-   python tools/evaluate_clinvar_checkpoint.py \
-       --config checkpoints/Clinvar_trm_ACT-torch/clinvar_smoke/all_config.yaml \
-       --checkpoint checkpoints/Clinvar_trm_ACT-torch/clinvar_smoke/step_62
-   # Add `--device cpu` if CUDA is unavailable.
-   ```
-
-5. Train the full 10 k ClinVar run (50 epochs, evaluator logs every 5 epochs):
+4. Rebuild the ClinVar dataset with phenotype/provenance context (5 k per class by default) and train the VariantTRM run (50 epochs, evaluator logs every 5 epochs):
    ```bash
    # Rebuild dataset after any feature changes (ClinSig columns are excluded by default)
-   python tools/prepare_clinvar_dataset.py --max-per-class 50000
+   python tools/prepare_clinvar_dataset.py --max-per-class 5000
    python tools/build_clinvar_trm_dataset.py
 
    WANDB_MODE=offline DISABLE_COMPILE=1 \
    python pretrain.py --config-name cfg_clinvar_long +run_name=clinvar_long
    ```
-   Add `+early_stop_patience=5` (and optional `+early_stop_metric`) to enable early stopping.
+   Add `+early_stop_patience=5` (and optional `+early_stop_metric`) to enable early stopping once the validation ROC AUC plateaus.  
+   Variant sequences now contain 25 tokens covering gene/allele features, three phenotype buckets, evidence sources, submitter/evaluation buckets, five position digits, and a label slot.
 
-6. Baseline comparison (logistic regression on the same split):
+5. Baseline comparison (logistic regression on the same split):
    ```bash
    python tools/train_baseline_logreg.py \
        --input data/clinvar/processed/clinvar_missense_balanced.tsv \
        --output outputs/clinvar_logreg_metrics.json
    ```
 
-7. Sanity test (ensures no ClinicalSignificance leakage):
+6. Sanity test (ensures no ClinicalSignificance leakage):
    ```bash
    python -m pytest tests/test_clinvar_dataset.py
    ```
    (Requires the balanced ClinVar TSV under `data/clinvar/processed/clinvar_missense_balanced.tsv`.)
 
-8. Hyperparameter sweep example:
+7. Evaluate checkpoints (CPU or CUDA):
+   ```bash
+   python tools/evaluate_clinvar_checkpoint.py \
+       --config checkpoints/Clinvar_trm-ACT-torch/clinvar_long_20251024-175518/all_config.yaml \
+      --checkpoint checkpoints/Clinvar_trm-ACT-torch/clinvar_long_20251024-175518/step_1248 \
+      --device cuda \
+      --output outputs/clinvar_trm_metrics.json \
+      --save-preds outputs/clinvar_trm_predictions.jsonl
+   ```
+   (Set `--device cpu` if GPUs are unavailable.)
+
+8. Generate documentation plots (optional):
+   ```bash
+   python scripts/plot_eval_comparison.py \
+       --trm outputs/clinvar_trm_metrics.json \
+       --baseline outputs/clinvar_logreg_metrics.json \
+       --output docs/figures/clinvar_metric_comparison.png
+
+   python scripts/plot_roc_curve.py \
+       --preds outputs/clinvar_trm_predictions.jsonl \
+       --output docs/figures/clinvar_trm_roc.png
+   ```
+   (Both scripts default to displaying the figure if `--output` is omitted.)
+
+9. Hyperparameter sweep example:
    ```bash
    WANDB_MODE=offline DISABLE_COMPILE=1 \
    python pretrain.py --config-name clinvar_sweep --multirun

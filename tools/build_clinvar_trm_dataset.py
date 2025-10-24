@@ -13,12 +13,13 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Set
+from collections import Counter
 
 import numpy as np
 import pandas as pd
 
-SEQ_LEN = 18  # CLS + feature slots (gene bucket, chromosome, review, ref/alt bases, amino acids, consequence) + 5 position digits + label slot
+SEQ_LEN = 25  # CLS + core features + phenotype/provenance tokens + phenotype tertiary + 5 position digits + label slot
 PAD_TOKEN = "PAD"
 CLS_TOKEN = "CLS"
 LABEL_SLOT_TOKEN = "LABEL_SLOT"
@@ -57,6 +58,49 @@ AA_PROPERTY = {
 
 AA_CHANGE_DEFAULT = '<unknown_change>'
 
+PHENOTYPE_OTHER = "<other>"
+PHENOTYPE_NONE = "<none>"
+PHENOTYPE_TOP_K = 50
+PHENOTYPE_SOURCE_TOP_K = 8
+PHENOTYPE_SLOT_COLUMN_NAMES = [
+    "PhenotypePrimaryToken",
+    "PhenotypeSecondaryToken",
+    "PhenotypeTertiaryToken",
+]
+PHENOTYPE_TOKEN_PREFIXES = [
+    "PHENO_PRIMARY",
+    "PHENO_SECONDARY",
+    "PHENO_TERTIARY",
+]
+
+PHENOTYPE_COUNT_BUCKETS = (
+    (0, "none"),
+    (1, "one"),
+    (2, "two"),
+    (3, "three_plus"),
+)
+
+SUBMITTER_BUCKETS = (
+    (0, "0"),
+    (1, "1"),
+    (3, "2_3"),
+    (5, "4_5"),
+    (float("inf"), "6_plus"),
+)
+
+EVAL_YEAR_BUCKETS = (
+    (2010, "pre2010"),
+    (2015, "2010_2014"),
+    (2020, "2015_2019"),
+    (float("inf"), "2020_plus"),
+)
+
+
+@dataclass(frozen=True)
+class FeatureBuckets:
+    phenotype_terms: Set[str]
+    phenotype_sources: Set[str]
+
 
 def get_repo_version() -> str:
     version_file = Path(__file__).resolve().parents[1] / "VERSION"
@@ -76,6 +120,92 @@ def get_git_commit() -> str:
         return commit.decode("utf-8").strip()
     except Exception:
         return "unknown"
+
+
+def _split_pipe_field(raw: Any) -> List[str]:
+    if not isinstance(raw, str):
+        return []
+    return [part for part in raw.split("|") if part]
+
+
+def _select_top_values(sequences: List[List[str]], top_k: int) -> Set[str]:
+    counter: Counter[str] = Counter()
+    for seq in sequences:
+        counter.update(seq)
+    return {value for value, _ in counter.most_common(top_k)}
+
+
+def _bucket_count(value: int) -> str:
+    for threshold, name in PHENOTYPE_COUNT_BUCKETS:
+        if value <= threshold:
+            return name
+    return PHENOTYPE_COUNT_BUCKETS[-1][1]
+
+
+def _bucket_submitters(value: int) -> str:
+    for threshold, name in SUBMITTER_BUCKETS:
+        if value <= threshold:
+            return name
+    return SUBMITTER_BUCKETS[-1][1]
+
+
+def _bucket_eval_year(iso_date: str) -> str:
+    if not isinstance(iso_date, str) or len(iso_date) < 4:
+        return "unknown"
+    try:
+        year = int(iso_date[:4])
+    except ValueError:
+        return "unknown"
+    for threshold, name in EVAL_YEAR_BUCKETS:
+        if year < threshold:
+            return name
+    return EVAL_YEAR_BUCKETS[-1][1]
+
+
+def build_feature_buckets(df: pd.DataFrame) -> FeatureBuckets:
+    phenotypes = df["PhenotypeTermsList"].tolist()
+    sources = df["PhenotypeSourcesList"].tolist()
+    top_terms = _select_top_values(phenotypes, PHENOTYPE_TOP_K)
+    top_sources = _select_top_values(sources, PHENOTYPE_SOURCE_TOP_K)
+    return FeatureBuckets(phenotype_terms=top_terms, phenotype_sources=top_sources)
+
+
+def apply_feature_buckets(df: pd.DataFrame, buckets: FeatureBuckets) -> pd.DataFrame:
+    df = df.copy()
+
+    def _map_term(term: str) -> str:
+        return term if term in buckets.phenotype_terms else PHENOTYPE_OTHER
+
+    def _phenotype_slots(terms: List[str]) -> List[str]:
+        slots: List[str] = []
+        seen = set()
+        for term in terms:
+            if term in seen:
+                continue
+            seen.add(term)
+            slots.append(_map_term(term))
+            if len(slots) == len(PHENOTYPE_SLOT_COLUMN_NAMES):
+                break
+        while len(slots) < len(PHENOTYPE_SLOT_COLUMN_NAMES):
+            slots.append(PHENOTYPE_NONE)
+        return slots
+
+    def _choose_source(sources: List[str]) -> str:
+        if not sources:
+            return PHENOTYPE_NONE
+        source = sources[0]
+        return source if source in buckets.phenotype_sources else PHENOTYPE_OTHER
+
+    phenotype_slot_values = df["PhenotypeTermsList"].apply(_phenotype_slots)
+    for idx, column_name in enumerate(PHENOTYPE_SLOT_COLUMN_NAMES):
+        df[column_name] = phenotype_slot_values.apply(lambda values, i=idx: values[i])
+
+    df["PhenotypeCountBucket"] = df["PhenotypeTermCount"].apply(_bucket_count)
+    df["PhenotypeSourceToken"] = df["PhenotypeSourcesList"].apply(_choose_source)
+    df["SubmitterBucket"] = df["SubmitterCount"].apply(_bucket_submitters)
+    df["EvalRecencyBucket"] = df["LastEvaluatedISO"].apply(_bucket_eval_year)
+
+    return df
 
 
 @dataclass
@@ -118,6 +248,43 @@ def parse_args() -> argparse.Namespace:
 
 def load_balanced_table(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, sep="\t")
+    # Ensure expected enrichment columns exist; fallback for older datasets
+    if "PhenotypeTerms" not in df.columns:
+        df["PhenotypeTerms"] = ""
+    if "PhenotypeSources" not in df.columns:
+        df["PhenotypeSources"] = ""
+    if "SubmitterCount" not in df.columns:
+        number_submitters = df.get("NumberSubmitters")
+        if number_submitters is None:
+            submitter_series = pd.Series([0] * len(df))
+        else:
+            submitter_series = pd.to_numeric(number_submitters, errors="coerce").fillna(0)
+        df["SubmitterCount"] = submitter_series.astype(int)
+    else:
+        df["SubmitterCount"] = pd.to_numeric(df["SubmitterCount"], errors="coerce").fillna(0).astype(int)
+    if "LastEvaluatedISO" not in df.columns:
+        last_eval = df.get("LastEvaluated")
+        if last_eval is None:
+            df["LastEvaluatedISO"] = [""] * len(df)
+        else:
+            iso_series = pd.to_datetime(last_eval, errors="coerce")
+            df["LastEvaluatedISO"] = iso_series.dt.strftime("%Y-%m-%d").fillna("")
+    else:
+        df["LastEvaluatedISO"] = df["LastEvaluatedISO"].fillna("")
+
+    df["PhenotypeTerms"] = df["PhenotypeTerms"].fillna("")
+    df["PhenotypeSources"] = df["PhenotypeSources"].fillna("")
+
+    df["PhenotypeTermsList"] = df["PhenotypeTerms"].apply(_split_pipe_field)
+    df["PhenotypeSourcesList"] = df["PhenotypeSources"].apply(_split_pipe_field)
+    df["PhenotypeTermCount"] = df["PhenotypeTermsList"].apply(len).astype(int)
+    phenotype_ids_series = df.get("PhenotypeIDs")
+    if phenotype_ids_series is None:
+        phenotype_ids_series = pd.Series([""] * len(df))
+    else:
+        phenotype_ids_series = phenotype_ids_series.fillna("")
+    df["PhenotypeIDCount"] = phenotype_ids_series.apply(_split_pipe_field).apply(len).astype(int)
+
     counts = df['GeneSymbol'].value_counts()
     common_genes = counts[counts >= 5].index
     df['GeneBucket'] = df['GeneSymbol'].where(df['GeneSymbol'].isin(common_genes), '<RARE>')
@@ -159,6 +326,17 @@ def build_vocab(df: pd.DataFrame) -> Dict[str, int]:
         add_token("REV", status)
     for consequence in sorted(df["Consequence"].unique()):
         add_token("CONSEQ", consequence)
+    for column_name, prefix in zip(PHENOTYPE_SLOT_COLUMN_NAMES, PHENOTYPE_TOKEN_PREFIXES):
+        for value in sorted(df[column_name].unique()):
+            add_token(prefix, value)
+    for source in sorted(df["PhenotypeSourceToken"].unique()):
+        add_token("PHENO_SOURCE", source)
+    for bucket in sorted(df["PhenotypeCountBucket"].unique()):
+        add_token("PHENO_COUNT", bucket)
+    for bucket in sorted(df["SubmitterBucket"].unique()):
+        add_token("SUBMITTERS", bucket)
+    for bucket in sorted(df["EvalRecencyBucket"].unique()):
+        add_token("EVAL", bucket)
     for digit in "0123456789":
         add_token("DIGIT", digit)
 
@@ -188,6 +366,12 @@ def encode_variant(
     seq.append(token_id(token_to_id, f"AAPROP:{row['AAPropTo']}"))
     seq.append(token_id(token_to_id, f"AACHANGE:{row['AAChangeClass']}"))
     seq.append(token_id(token_to_id, f"CONSEQ:{row['Consequence']}"))
+    for column_name, prefix in zip(PHENOTYPE_SLOT_COLUMN_NAMES, PHENOTYPE_TOKEN_PREFIXES):
+        seq.append(token_id(token_to_id, f"{prefix}:{row[column_name]}"))
+    seq.append(token_id(token_to_id, f"PHENO_SOURCE:{row['PhenotypeSourceToken']}"))
+    seq.append(token_id(token_to_id, f"PHENO_COUNT:{row['PhenotypeCountBucket']}"))
+    seq.append(token_id(token_to_id, f"SUBMITTERS:{row['SubmitterBucket']}"))
+    seq.append(token_id(token_to_id, f"EVAL:{row['EvalRecencyBucket']}"))
 
     pos_str = f"{int(row['ProteinPos']):05d}"
     for digit in pos_str:
@@ -257,6 +441,7 @@ def save_split(
     num_identifiers: int,
     code_version: str,
     git_commit: str,
+    feature_metadata: Dict[str, Any],
 ) -> None:
     split_dir.mkdir(parents=True, exist_ok=True)
 
@@ -279,6 +464,7 @@ def save_split(
         "sets": ["all"],
         "code_version": code_version,
         "git_commit": git_commit,
+        "feature_metadata": feature_metadata,
     }
 
     with open(split_dir / "dataset.json", "w") as f:
@@ -305,10 +491,24 @@ if __name__ == "__main__":
     df = df.reset_index(drop=True)
     df["VariantIdentifier"] = np.arange(1, len(df) + 1, dtype=np.int32)
 
+    feature_buckets = build_feature_buckets(df)
+    df = apply_feature_buckets(df, feature_buckets)
+
     token_to_id = build_vocab(df)
     vocab_size = len(token_to_id)
     pad_id = token_to_id[PAD_TOKEN]
     num_identifiers = int(df["VariantIdentifier"].max()) + 1
+
+    feature_metadata = {
+        "phenotype_terms_top": sorted(feature_buckets.phenotype_terms),
+        "phenotype_sources_top": sorted(feature_buckets.phenotype_sources),
+        "phenotype_top_k": PHENOTYPE_TOP_K,
+        "phenotype_source_top_k": PHENOTYPE_SOURCE_TOP_K,
+        "phenotype_slot_columns": PHENOTYPE_SLOT_COLUMN_NAMES,
+        "phenotype_count_buckets": [name for _, name in PHENOTYPE_COUNT_BUCKETS],
+        "submitter_buckets": [name for _, name in SUBMITTER_BUCKETS],
+        "eval_year_buckets": [name for _, name in EVAL_YEAR_BUCKETS],
+    }
 
     train_df, test_df = stratified_split(df, args.train_ratio, args.seed)
 
@@ -326,6 +526,7 @@ if __name__ == "__main__":
         num_identifiers,
         code_version,
         git_commit,
+        feature_metadata,
     )
     save_split(
         args.output_dir / "test",
@@ -335,6 +536,7 @@ if __name__ == "__main__":
         num_identifiers,
         code_version,
         git_commit,
+        feature_metadata,
     )
 
     identifier_strings = (
@@ -346,23 +548,3 @@ if __name__ == "__main__":
     save_vocab(args.output_dir, token_to_id)
 
     print(f"Wrote ClinVar TRM dataset to {args.output_dir}")
-def get_repo_version() -> str:
-    version_file = Path(__file__).resolve().parents[1] / "VERSION"
-    try:
-        return version_file.read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        return "unknown"
-
-
-def get_git_commit() -> str:
-    import subprocess
-
-    try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
-        )
-        return commit.decode("utf-8").strip()
-    except Exception:
-        return "unknown"
-    for consequence in sorted(set(df['Consequence'].unique()).union(set(df['GeneSymbol'].unique()))):
-        add_token('CONSEQ', consequence)
