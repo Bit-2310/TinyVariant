@@ -60,6 +60,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    if not args.trm.exists():
+        raise FileNotFoundError(f"TRM metrics file not found: {args.trm}")
+    if not args.baseline.exists():
+        raise FileNotFoundError(f"Baseline metrics file not found: {args.baseline}")
+
     trm_metrics = load_metrics(args.trm)
     baseline_metrics = load_metrics(args.baseline)
 
