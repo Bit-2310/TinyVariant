@@ -145,3 +145,8 @@
 - Added `scripts/plot_eval_comparison.py` to visualize TinyVariant vs. baseline accuracy/AUC from saved JSON metrics.
 - Added `scripts/plot_roc_curve.py` to render ROC curves from prediction JSONL files (pairs with the new evaluation flag).
 - README Quickstart now documents the evaluation output flags and plotting workflow for future write-ups.
+
+2025-10-24, 19:40 : Feature ablation toggles + scaling notes
+- Added `--phenotype-ablation` and `--provenance-ablation` flags to `tools/build_clinvar_trm_dataset.py` so we can rebuild datasets with phenotype tokens or provenance buckets zeroed out.
+- Feature metadata now records the ablation state; downstream baselines/TRM runs pick up the altered dataset automatically.
+- README/Instructions document how to run ablation rebuilds and how to scale preprocessing to 50k+ examples via `--max-per-class`.

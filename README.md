@@ -114,7 +114,24 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```
    (Both scripts default to displaying the figure if `--output` is omitted.)
 
-9. Hyperparameter sweep example:
+9. Optional feature ablations:
+   ```bash
+   # Phenotype-only ablation
+   python tools/build_clinvar_trm_dataset.py --phenotype-ablation
+
+   # Provenance ablation (submitter/eval buckets)
+   python tools/build_clinvar_trm_dataset.py --provenance-ablation
+   ```
+   Re-run the baseline/TRM commands against `data/clinvar/processed/clinvar_trm` after each ablation to measure impact.
+
+10. Scale to larger datasets (e.g., 50k per class):
+    ```bash
+    python tools/prepare_clinvar_dataset.py --max-per-class 50000
+    python tools/build_clinvar_trm_dataset.py
+    ```
+    Expect longer preprocessing/training time and higher disk usage when increasing `--max-per-class`.
+
+11. Hyperparameter sweep example:
    ```bash
    WANDB_MODE=offline DISABLE_COMPILE=1 \
    python pretrain.py --config-name clinvar_sweep --multirun

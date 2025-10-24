@@ -243,6 +243,16 @@ def parse_args() -> argparse.Namespace:
         default=RANDOM_SEED,
         help="Random seed for stratified split (default: %(default)s)",
     )
+    parser.add_argument(
+        "--phenotype-ablation",
+        action="store_true",
+        help="Replace phenotype tokens with <none> to evaluate impact of phenotype features.",
+    )
+    parser.add_argument(
+        "--provenance-ablation",
+        action="store_true",
+        help="Zero out provenance/submitter/evaluation buckets to ablate provenance features.",
+    )
     return parser.parse_args()
 
 
@@ -341,6 +351,37 @@ def build_vocab(df: pd.DataFrame) -> Dict[str, int]:
         add_token("DIGIT", digit)
 
     return token_to_id
+
+
+def apply_ablation_flags(
+    df: pd.DataFrame,
+    phenotype_ablation: bool,
+    provenance_ablation: bool,
+) -> pd.DataFrame:
+    df = df.copy()
+
+    if phenotype_ablation:
+        df["PhenotypeTerms"] = ""
+        df["PhenotypeSources"] = ""
+        df["PhenotypeTermsList"] = [[] for _ in range(len(df))]
+        df["PhenotypeSourcesList"] = [[] for _ in range(len(df))]
+        df["PhenotypeTermCount"] = 0
+        df["PhenotypeIDCount"] = 0
+
+        for column_name in PHENOTYPE_SLOT_COLUMN_NAMES:
+            df[column_name] = PHENOTYPE_NONE
+
+        df["PhenotypeSourceToken"] = PHENOTYPE_NONE
+        df["PhenotypeCountBucket"] = PHENOTYPE_COUNT_BUCKETS[0][1]
+
+    if provenance_ablation:
+        df["SubmitterBucket"] = SUBMITTER_BUCKETS[0][1]
+        df["EvalRecencyBucket"] = EVAL_YEAR_BUCKETS[0][1]
+        if not phenotype_ablation:
+            df["PhenotypeSourceToken"] = PHENOTYPE_NONE
+            df["PhenotypeCountBucket"] = PHENOTYPE_COUNT_BUCKETS[0][1]
+
+    return df
 
 
 def token_id(token_to_id: Dict[str, int], token: str) -> int:
@@ -493,6 +534,11 @@ if __name__ == "__main__":
 
     feature_buckets = build_feature_buckets(df)
     df = apply_feature_buckets(df, feature_buckets)
+    df = apply_ablation_flags(
+        df,
+        phenotype_ablation=args.phenotype_ablation,
+        provenance_ablation=args.provenance_ablation,
+    )
 
     token_to_id = build_vocab(df)
     vocab_size = len(token_to_id)
@@ -508,6 +554,8 @@ if __name__ == "__main__":
         "phenotype_count_buckets": [name for _, name in PHENOTYPE_COUNT_BUCKETS],
         "submitter_buckets": [name for _, name in SUBMITTER_BUCKETS],
         "eval_year_buckets": [name for _, name in EVAL_YEAR_BUCKETS],
+        "phenotype_ablation": bool(args.phenotype_ablation),
+        "provenance_ablation": bool(args.provenance_ablation),
     }
 
     train_df, test_df = stratified_split(df, args.train_ratio, args.seed)
