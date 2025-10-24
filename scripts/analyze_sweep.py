@@ -5,8 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
+import csv
 
 SWEEP_ROOT = Path("checkpoints/Clinvar_trm-ACT-torch")
 
@@ -21,8 +20,8 @@ def load_run_metrics(run_dir: Path) -> dict:
 
     return {
         "run": run_dir.name,
-        "roc_auc": metrics.get("ClinVar/roc_auc", float("nan")),
-        "accuracy": metrics.get("ClinVar/accuracy", float("nan")),
+        "roc_auc": metrics.get("ClinVar/roc_auc"),
+        "accuracy": metrics.get("ClinVar/accuracy"),
         "hidden_size": cfg["arch"]["hidden_size"],
         "L_layers": cfg["arch"]["L_layers"],
         "L_cycles": cfg["arch"]["L_cycles"],
@@ -39,17 +38,24 @@ def main() -> None:
         return
 
     records = [load_run_metrics(run) for run in runs if (run / 'all_config.yaml').exists()]
-    df = pd.DataFrame(records)
-    df = df.dropna(subset=["roc_auc", "accuracy"])
-    if df.empty:
-        print("No metrics found; ensure sweep has finished.")
+    if not records:
+        print('No completed runs found (missing all_config or metrics).')
+        return
+    finished = [r for r in records if r['roc_auc'] is not None and r['accuracy'] is not None]
+    if not finished:
+        print('No runs reported ClinVar metrics yet.')
         return
 
-    best = df.sort_values("roc_auc", ascending=False).iloc[0]
-    print("Best run:")
-    print(best)
-    df.to_csv("sweep_summary.csv", index=False)
-    print("Summary saved to sweep_summary.csv")
+    best = max(finished, key=lambda r: r['roc_auc'])
+    print('Best run:')
+    for k, v in best.items():
+        print(f'  {k}: {v}')
+
+    with open('sweep_summary.csv', 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=finished[0].keys())
+        writer.writeheader()
+        writer.writerows(finished)
+    print('Summary saved to sweep_summary.csv')
 
 
 if __name__ == "__main__":

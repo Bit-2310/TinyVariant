@@ -82,6 +82,9 @@ class PretrainConfig(pydantic.BaseModel):
     ema: bool = False # use Exponential-Moving-Average
     ema_rate: float = 0.999 # EMA-rate
     freeze_weights: bool = False # If True, freeze weights and only learn the embeddings
+    early_stop_patience: Optional[int] = None
+    early_stop_metric: str = "ClinVar/roc_auc"
+    early_stop_delta: float = 0.0
 
 @dataclass
 class TrainState:
@@ -278,6 +281,22 @@ def compute_lr(base_lr: float, config: PretrainConfig, train_state: TrainState):
     )
 
 
+
+
+
+def _get_metric_value(metrics: dict[str, Any], key: str) -> Optional[float]:
+    if key in metrics and isinstance(metrics[key], (int, float)):
+        return float(metrics[key])
+    if '.' in key:
+        current: Any = metrics
+        for part in key.split('.'):
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return None
+        if isinstance(current, (int, float)):
+            return float(current)
+    return None
 
 def create_evaluators(config: PretrainConfig, eval_metadata: PuzzleDatasetMetadata) -> List[Any]:
     data_paths =config.data_paths_test if len(config.data_paths_test)>0 else config.data_paths
@@ -588,6 +607,10 @@ def launch(hydra_config: DictConfig):
     # Train state
     train_state = init_train_state(config, train_metadata, rank=RANK, world_size=WORLD_SIZE)
 
+    best_metric = float('-inf')
+    patience_counter = 0
+    should_stop = False
+
     # Progress bar and logger
     progress_bar = None
     ema_helper = None
@@ -640,7 +663,19 @@ def launch(hydra_config: DictConfig):
 
             if RANK == 0 and metrics is not None:
                 wandb.log(metrics, step=train_state.step)
-                
+
+                if config.early_stop_patience is not None:
+                    metric_value = _get_metric_value(metrics, config.early_stop_metric)
+                    if metric_value is not None:
+                        if metric_value > best_metric + config.early_stop_delta:
+                            best_metric = metric_value
+                            patience_counter = 0
+                        else:
+                            patience_counter += 1
+                            if patience_counter >= config.early_stop_patience:
+                                should_stop = True
+                                print(f"Early stopping triggered at step {train_state.step}: {config.early_stop_metric}={metric_value:.4f}")
+
             ############ Checkpointing
             if RANK == 0:
                 print("SAVE CHECKPOINT")
@@ -649,6 +684,9 @@ def launch(hydra_config: DictConfig):
 
             if config.ema:
                 del train_state_eval
+
+            if should_stop:
+                break
 
     # finalize
     if dist.is_initialized():

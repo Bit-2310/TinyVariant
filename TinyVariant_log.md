@@ -101,3 +101,8 @@
 2025-10-23, 19:00 : Integrated sweep analyzer
 - Updated `config/clinvar_sweep.yaml` to rely on Hydra override directories.
 - Added `scripts/analyze_sweep.py` and documented the workflow (run sweep + analyzer).
+
+2025-10-23, 19:20 : Added early stopping support
+- `PretrainConfig` now accepts `early_stop_patience`, `early_stop_metric`, and `early_stop_delta`.
+- Training loop stops when the chosen metric fails to improve beyond `early_stop_delta` for `patience` evaluations.
+- README documents usage via `+early_stop_patience=...`.

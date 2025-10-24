@@ -76,13 +76,13 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
 5. Train the full 10 k ClinVar run (50 epochs, evaluator logs every 5 epochs):
    ```bash
    # Rebuild dataset after any feature changes (ClinSig columns are excluded by default)
-   python tools/prepare_clinvar_dataset.py --max-per-class 5000
+   python tools/prepare_clinvar_dataset.py --max-per-class 50000
    python tools/build_clinvar_trm_dataset.py
 
    WANDB_MODE=offline DISABLE_COMPILE=1 \
    python pretrain.py --config-name cfg_clinvar_long +run_name=clinvar_long
    ```
-   To scale further (e.g., 50 k per class), bump `--max-per-class` before rebuilding.
+   Add `+early_stop_patience=5` (and optional `+early_stop_metric`) to enable early stopping.
 
 6. Baseline comparison (logistic regression on the same split):
    ```bash
