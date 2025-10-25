@@ -105,14 +105,17 @@ def create_dataloader(config: PretrainConfig, split: str, rank: int, world_size:
         num_replicas=world_size,
         **kwargs
     ), split=split)
-    dataloader = DataLoader(
-        dataset,
+    num_workers = int(os.environ.get("TINYVARIANT_NUM_WORKERS", "1"))
+    num_workers = max(num_workers, 0)
+    dataloader_kwargs = dict(
         batch_size=None,
-        num_workers=1,
-        prefetch_factor=8,
+        num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=True
+        persistent_workers=num_workers > 0,
     )
+    if num_workers > 0:
+        dataloader_kwargs["prefetch_factor"] = 8
+    dataloader = DataLoader(dataset, **dataloader_kwargs)
     return dataloader, dataset.metadata
 
 
@@ -616,8 +619,17 @@ def launch(hydra_config: DictConfig):
     ema_helper = None
     if RANK == 0:
         progress_bar = tqdm.tqdm(total=train_state.total_steps)
-        wandb.init(project=config.project_name, name=config.run_name, config=config.model_dump(), settings=wandb.Settings(_disable_stats=True))  # type: ignore
-        wandb.log({"num_params": sum(x.numel() for x in train_state.model.parameters())}, step=0)
+        log_to_wandb = False
+        if os.environ.get("WANDB_DISABLED", "").lower() in {"1", "true", "yes"}:
+            print("WandB disabled via WANDB_DISABLED; skipping logging")
+        else:
+            try:
+                wandb.init(project=config.project_name, name=config.run_name, config=config.model_dump(), settings=wandb.Settings(_disable_stats=True))  # type: ignore
+                wandb.log({"num_params": sum(x.numel() for x in train_state.model.parameters())}, step=0)
+                log_to_wandb = True
+            except Exception as wandb_exc:  # pylint: disable=broad-except
+                print(f"Warning: WandB init failed ({wandb_exc}); continuing without WandB logging.")
+        config.__dict__["_log_to_wandb"] = log_to_wandb
         save_code_and_config(config)
     if config.ema:
         print('Setup EMA')
@@ -636,7 +648,8 @@ def launch(hydra_config: DictConfig):
             metrics = train_batch(config, train_state, batch, global_batch_size, rank=RANK, world_size=WORLD_SIZE)
 
             if RANK == 0 and metrics is not None:
-                wandb.log(metrics, step=train_state.step)
+                if getattr(config, "_log_to_wandb", False):
+                    wandb.log(metrics, step=train_state.step)
                 progress_bar.update(train_state.step - progress_bar.n)  # type: ignore
             if config.ema:
                 ema_helper.update(train_state.model)
@@ -662,7 +675,8 @@ def launch(hydra_config: DictConfig):
                 cpu_group=CPU_PROCESS_GROUP)
 
             if RANK == 0 and metrics is not None:
-                wandb.log(metrics, step=train_state.step)
+                if getattr(config, "_log_to_wandb", False):
+                    wandb.log(metrics, step=train_state.step)
 
                 if config.early_stop_patience is not None:
                     metric_value = _get_metric_value(metrics, config.early_stop_metric)
@@ -691,7 +705,8 @@ def launch(hydra_config: DictConfig):
     # finalize
     if dist.is_initialized():
         dist.destroy_process_group()
-    wandb.finish()
+    if getattr(config, "_log_to_wandb", False):
+        wandb.finish()
 
 
 if __name__ == "__main__":

@@ -156,3 +156,13 @@
 - Logistic baseline on the 80k/20k split reached accuracy 0.8955, ROC AUC 0.9591.
 - Trained `cfg_clinvar_long` with early stopping (run `clinvar_long_20251024-194100`); stopped at step 9372 with eval accuracy 0.8828 and ROC AUC 0.9450.
 - Updated `tools/evaluate_clinvar_checkpoint.py` to move carries to the active device so GPU evaluation succeeds; metrics for `step_9372` are stored in `outputs/clinvar_trm_metrics.json` and the ROC curve in `docs/figures/clinvar_trm_roc.png`.
+
+2025-10-24, 21:55 : Phenotype ablation baseline
+- Rebuilt TRM dataset with `--phenotype-ablation` (phenotype slots forced to `<none>`).
+- TRM run `clinvar_long_phenotype_ablation_20251024-215110` (W&B disabled, single-worker loader) early-stopped at step 14058: eval accuracy 0.8741, ROC AUC 0.9417.
+- Evaluated checkpoint `step_14058` on CPU (GPU evaluation timing out) → metrics saved to `outputs/clinvar_long_phenotype_ablation_20251024-215110_metrics.json`, predictions in `_predictions.jsonl`.
+
+2025-10-25, 07:55 : Provenance ablation baseline
+- Rebuilt TRM dataset with `--provenance-ablation` (submitter/evaluation buckets set to the lowest bucket).
+- TRM run `clinvar_long_provenance_ablation_20251025-074717` (WANDB offline, single-worker loader) completed full schedule; eval accuracy 0.8755, ROC AUC 0.9438.
+- Evaluated checkpoint `step_15620` on CPU → metrics in `outputs/clinvar_long_provenance_ablation_20251025-074717_metrics.json`, predictions in `_predictions.jsonl`.

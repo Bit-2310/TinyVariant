@@ -94,10 +94,10 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
    ```bash
    python tools/evaluate_clinvar_checkpoint.py \
        --config checkpoints/Clinvar_trm-ACT-torch/clinvar_long_20251024-175518/all_config.yaml \
-      --checkpoint checkpoints/Clinvar_trm-ACT-torch/clinvar_long_20251024-175518/step_1248 \
-      --device cuda \
-      --output outputs/clinvar_trm_metrics.json \
-      --save-preds outputs/clinvar_trm_predictions.jsonl
+       --checkpoint checkpoints/Clinvar_trm-ACT-torch/clinvar_long_20251024-175518/step_1248 \
+       --device cuda \
+       --output outputs/clinvar_trm_metrics.json \
+       --save-preds outputs/clinvar_trm_predictions.jsonl
    ```
    (Set `--device cpu` if GPUs are unavailable.)
 
@@ -131,7 +131,18 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
     ```
     Expect longer preprocessing/training time and higher disk usage when increasing `--max-per-class`.
 
-11. Hyperparameter sweep example:
+11. Next step – hyperparameter tuning
+    ```bash
+    WANDB_MODE=offline DISABLE_COMPILE=1 \
+    python pretrain.py --config-name clinvar_sweep --multirun
+
+    python scripts/analyze_sweep.py
+    ```
+    Review `sweep_summary.csv` to identify stronger architectures (wider hidden size, deeper L_cycles) for the 50k dataset.
+
+12. Further analysis (optional)
+    - **Feature ablation comparison** – after running phenotype/provenance ablations, compare `outputs/*_metrics.json` files to quantify each feature family’s contribution.
+    - **Per-variant inspection** – use `tools/evaluate_clinvar_checkpoint.py --save-preds` to slice predictions by phenotype, gene, or review status.
    ```bash
    WANDB_MODE=offline DISABLE_COMPILE=1 \
    python pretrain.py --config-name clinvar_sweep --multirun
