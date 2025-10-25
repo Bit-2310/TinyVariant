@@ -149,6 +149,7 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
           --no-provenance outputs/clinvar_long_provenance_ablation_20251025-074717_metrics.json \
           --output docs/figures/clinvar_trm_ablation_comparison.png
       ```
+      ![TRM Ablation Comparison](docs/figures/clinvar_trm_ablation_comparison.png)
     - **Per-variant inspection** – use `tools/evaluate_clinvar_checkpoint.py --save-preds` to slice predictions by phenotype, gene, or review status.
    ```bash
    WANDB_MODE=offline DISABLE_COMPILE=1 \
