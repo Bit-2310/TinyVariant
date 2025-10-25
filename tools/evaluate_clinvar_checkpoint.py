@@ -29,6 +29,10 @@ from pretrain import PretrainConfig, create_model
 from puzzle_dataset import PuzzleDataset, PuzzleDatasetConfig
 from dataset.common import PuzzleDatasetMetadata
 from models.losses import IGNORE_LABEL_ID
+from models.recursive_reasoning.trm import (
+    TinyRecursiveReasoningModel_ACTV1Carry,
+    TinyRecursiveReasoningModel_ACTV1InnerCarry,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -174,6 +178,7 @@ def main() -> None:
                 batch = {k: v.to(device) for k, v in batch.items()}
                 with device_ctx:
                     carry = model.initial_carry(batch)
+                carry = _move_carry_to_device(carry, device)
             else:
                 batch = {k: v.cpu() for k, v in batch.items()}
                 carry = model.initial_carry(batch)
@@ -241,3 +246,13 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+def _move_carry_to_device(
+    carry: TinyRecursiveReasoningModel_ACTV1Carry,
+    device: torch.device,
+) -> TinyRecursiveReasoningModel_ACTV1Carry:
+    carry.inner_carry.z_H = carry.inner_carry.z_H.to(device)
+    carry.inner_carry.z_L = carry.inner_carry.z_L.to(device)
+    carry.steps = carry.steps.to(device)
+    carry.halted = carry.halted.to(device)
+    carry.current_data = {k: v.to(device) for k, v in carry.current_data.items()}
+    return carry

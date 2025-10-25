@@ -150,3 +150,9 @@
 - Added `--phenotype-ablation` and `--provenance-ablation` flags to `tools/build_clinvar_trm_dataset.py` so we can rebuild datasets with phenotype tokens or provenance buckets zeroed out.
 - Feature metadata now records the ablation state; downstream baselines/TRM runs pick up the altered dataset automatically.
 - README/Instructions document how to run ablation rebuilds and how to scale preprocessing to 50k+ examples via `--max-per-class`.
+
+2025-10-24, 21:05 : 50k-per-class ClinVar run results
+- Rebuilt the balanced dataset with `--max-per-class 50000` (100k examples total; ~61k carry phenotype annotations) and refreshed the TRM arrays.
+- Logistic baseline on the 80k/20k split reached accuracy 0.8955, ROC AUC 0.9591.
+- Trained `cfg_clinvar_long` with early stopping (run `clinvar_long_20251024-194100`); stopped at step 9372 with eval accuracy 0.8828 and ROC AUC 0.9450.
+- Updated `tools/evaluate_clinvar_checkpoint.py` to move carries to the active device so GPU evaluation succeeds; metrics for `step_9372` are stored in `outputs/clinvar_trm_metrics.json` and the ROC curve in `docs/figures/clinvar_trm_roc.png`.
