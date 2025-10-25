@@ -142,6 +142,13 @@ a variant-analysis toolkit; if not, we pivot with a clear conscience.
 
 12. Further analysis (optional)
     - **Feature ablation comparison** – after running phenotype/provenance ablations, compare `outputs/*_metrics.json` files to quantify each feature family’s contribution.
+      ```bash
+      python scripts/plot_trm_ablation.py \
+          --full outputs/clinvar_trm_metrics.json \
+          --no-phenotype outputs/clinvar_long_phenotype_ablation_20251024-215110_metrics.json \
+          --no-provenance outputs/clinvar_long_provenance_ablation_20251025-074717_metrics.json \
+          --output docs/figures/clinvar_trm_ablation_comparison.png
+      ```
     - **Per-variant inspection** – use `tools/evaluate_clinvar_checkpoint.py --save-preds` to slice predictions by phenotype, gene, or review status.
    ```bash
    WANDB_MODE=offline DISABLE_COMPILE=1 \
